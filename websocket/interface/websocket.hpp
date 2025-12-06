@@ -12,12 +12,10 @@
 // наш интерфейс логгера
 #include <logging.hpp>
 
-namespace Utils::Net::WebSocket {
+namespace Utils::Net::Websocket {
 
     namespace Logging = Utils::Logging;
     using JsonValue = boost::json::value;
-
-    // ===================== Общие штуки =====================
 
     enum class Mode
     {
@@ -39,17 +37,17 @@ namespace Utils::Net::WebSocket {
 
         virtual ~Listener() = default;
 
-        virtual void OnSessionConnected(const std::shared_ptr<Session>& session) = 0;
-        virtual void OnSessionDisconnected(const std::shared_ptr<Session>& session) = 0;
+        virtual void OnSessionConnected(const std::shared_ptr<Session>& session) {};
+        virtual void OnSessionDisconnected(const std::shared_ptr<Session>& session) {};
 
         virtual void OnMessage(const std::shared_ptr<Session>& session,
-                               const std::vector<std::uint8_t>& data) = 0;
+                               const std::vector<std::uint8_t>& data) {};
 
         virtual void OnMessage(const std::shared_ptr<Session>& session,
-                               std::string_view text) = 0;
+                               std::string_view text) {};
 
         virtual void OnMessage(const std::shared_ptr<Session>& session,
-                               const JsonValue& json) = 0;
+                               const JsonValue& json) {};
     };
 
     // ===================== SERVER CONFIG =====================
@@ -81,7 +79,6 @@ namespace Utils::Net::WebSocket {
         [[nodiscard]] virtual std::string RemoteAddress() const = 0;
         [[nodiscard]] virtual std::uint16_t RemotePort() const = 0;
 
-        // Логгер с префиксом [CORE][WS][IP]
         virtual Logging::Logger::Shared& Log() = 0;
 
         virtual void Close() = 0;
@@ -102,11 +99,14 @@ namespace Utils::Net::WebSocket {
 
         virtual void ProcessTick() = 0;
 
+        virtual Logging::Logger::Shared& Log() = 0;
+
+        virtual void SetupListener(const Listener::Shared& listener) = 0;
+
         [[nodiscard]] virtual Mode GetMode() const = 0;
 
-        // logger опционален — по умолчанию Utils::Log()->CreateChild("WS")
         static Shared Create(const ServerConfig& config,
-                             const Listener::Shared& listener,
+                             const Listener::Shared& listener = nullptr,
                              const Logging::Logger::Shared& logger = nullptr);
     };
 
@@ -131,7 +131,7 @@ namespace Utils::Net::WebSocket {
     {
         std::string host { "127.0.0.1" };
         std::uint16_t port { 8080 };
-        std::string path { "/" };      // HTTP target для WS, например "/ws"
+        std::string path { "/" };
 
         Mode mode { Mode::Text };
 
@@ -144,7 +144,6 @@ namespace Utils::Net::WebSocket {
         // потоков io_context
         std::size_t ioThreads { 1 };
 
-        // автореконнект
         bool autoReconnect { true };
         std::uint32_t reconnectDelayMs { 1000 };
     };
@@ -156,8 +155,9 @@ namespace Utils::Net::WebSocket {
 
         virtual ~Client() = default;
 
-        // Вызывать из основного потока, чтобы отработали callback-и
         virtual void ProcessTick() = 0;
+
+        virtual Logging::Logger::Shared& Log() = 0;
 
         virtual void Send(const std::vector<std::uint8_t>& data) = 0;
         virtual void Send(std::string_view text) = 0;
@@ -165,10 +165,9 @@ namespace Utils::Net::WebSocket {
 
         virtual void Close() = 0;
 
-        // logger опционален — по умолчанию Utils::Log()->CreateChild("WS-CLIENT")
         static Shared Create(const ClientConfig& config,
-                             const ClientListener::Shared& listener,
+                             const ClientListener::Shared& listener = nullptr,
                              const Logging::Logger::Shared& logger = nullptr);
     };
 
-} // namespace Utils::Net::WebSocket
+} // namespace Utils::Net::Websocket

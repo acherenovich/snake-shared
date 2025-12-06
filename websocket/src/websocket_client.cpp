@@ -3,7 +3,7 @@
 #include <format>
 #include <memory>
 
-namespace Utils::Net::WebSocket {
+namespace Utils::Net::Websocket {
 
     using asio::ip::tcp;
 
@@ -12,7 +12,6 @@ namespace Utils::Net::WebSocket {
                            const Logging::Logger::Shared& logger)
         : config_(config)
         , listener_(listener)
-        , logger_(logger)
         , ioContext_()
         , resolver_(ioContext_)
         , workGuard_(asio::make_work_guard(ioContext_))
@@ -20,10 +19,13 @@ namespace Utils::Net::WebSocket {
         , sslContext_(asio::ssl::context::tls_client)
         , reconnectTimer_(ioContext_)
     {
-        if (!logger_)
+        if (!logger)
         {
-            auto& globalLogger = Utils::Log();
-            logger_ = globalLogger->CreateChild("WS-CLIENT");
+            logger_ = Utils::Log()->CreateChild("WS-CLIENT");
+        }
+        else
+        {
+            logger_ = logger->CreateChild("WS-CLIENT");
         }
 
         if (config_.useTls)
@@ -114,7 +116,6 @@ namespace Utils::Net::WebSocket {
 
     void ClientImpl::StopThreads()
     {
-        // std::jthread сам join'ится в деструкторе
         threads_.clear();
     }
 
@@ -546,6 +547,11 @@ namespace Utils::Net::WebSocket {
         }
     }
 
+    Logging::Logger::Shared& ClientImpl::Log()
+    {
+        return logger_;
+    }
+
     void ClientImpl::EnqueueSendInternal(const std::string& payload)
     {
         {
@@ -674,8 +680,6 @@ namespace Utils::Net::WebSocket {
         }
     }
 
-    // ======= фабрика Client::Create =======
-
     Client::Shared Client::Create(const ClientConfig& config,
                                   const ClientListener::Shared& listener,
                                   const Logging::Logger::Shared& logger)
@@ -685,4 +689,4 @@ namespace Utils::Net::WebSocket {
         return client;
     }
 
-} // namespace Utils::Net::WebSocket
+} // namespace Utils::Net::Websocket

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../interface/websocket.hpp"
-
 #include <atomic>
 #include <deque>
 #include <mutex>
@@ -13,16 +11,16 @@
 #include <boost/asio/ssl.hpp>
 #include <boost/beast/core.hpp>
 
-#include "../../logging/interface/logging.hpp"
+#include <websocket.hpp>
+#include <logging.hpp>
 
-namespace Utils::Net::WebSocket {
-
+namespace Utils::Net::Websocket {
     namespace asio  = boost::asio;
     namespace beast = boost::beast;
     using boost::system::error_code;
     namespace ssl   = asio::ssl;
 
-    class BasicSessionBase; // внутренняя база для сессий (через Session)
+    class BasicSessionBase;
 
     enum class EventType
     {
@@ -55,6 +53,11 @@ namespace Utils::Net::WebSocket {
         ~ServerImpl() override;
 
         void ProcessTick() override;
+
+        Logging::Logger::Shared& Log() override;
+
+        void SetupListener(const Listener::Shared& listener) override;
+
         [[nodiscard]] Mode GetMode() const override;
 
         void EnqueueEvent(const Event& event);
@@ -88,4 +91,4 @@ namespace Utils::Net::WebSocket {
         std::deque<Event> events_;
     };
 
-} // namespace Utils::Net::WebSocket
+} // namespace Utils::Net::Websocket

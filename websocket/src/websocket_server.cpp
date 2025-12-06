@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <format>
 
-namespace Utils::Net::WebSocket {
+namespace Utils::Net::Websocket {
 
     using asio::ip::tcp;
 
@@ -17,20 +17,14 @@ namespace Utils::Net::WebSocket {
         , acceptor_(ioContext_)
         , sslContext_(ssl::context::tls_server)
     {
-        // базовый логгер: либо переданный, либо глобальный Utils::Log()
-        Logging::Logger::Shared baseLogger;
-
         if (logger)
         {
-            baseLogger = logger;
+            logger_ = logger->CreateChild("WS-SERVER");
         }
         else
         {
-            baseLogger = Utils::Log();
+            logger_ = Utils::Log()->CreateChild("WS-SERVER");
         }
-
-        // [CORE] [WS] ...
-        logger_ = baseLogger->CreateChild("WS");
 
         if (config_.useTls)
         {
@@ -303,6 +297,16 @@ namespace Utils::Net::WebSocket {
         }
     }
 
+    Logging::Logger::Shared& ServerImpl::Log()
+    {
+        return logger_;
+    }
+
+    void ServerImpl::SetupListener(const Listener::Shared& listener)
+    {
+        listener_ = listener;
+    }
+
     // ======= Фабрика Server::Create =======
 
     Server::Shared Server::Create(const ServerConfig& config,
@@ -312,4 +316,4 @@ namespace Utils::Net::WebSocket {
         return std::make_shared<ServerImpl>(config, listener, logger);
     }
 
-} // namespace Utils::Net::WebSocket
+} // namespace Utils::Net::Websocket

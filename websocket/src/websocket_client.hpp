@@ -6,8 +6,8 @@
 #include <mutex>
 #include <string>
 #include <vector>
-#include <thread>      // std::jthread
-#include <memory>      // std::enable_shared_from_this
+#include <thread>
+#include <memory>
 #include <atomic>
 
 #include <boost/asio.hpp>
@@ -19,7 +19,7 @@
 
 #include <logging.hpp>
 
-namespace Utils::Net::WebSocket {
+namespace Utils::Net::Websocket {
 
     namespace asio      = boost::asio;
     namespace beast     = boost::beast;
@@ -58,10 +58,11 @@ namespace Utils::Net::WebSocket {
 
         ~ClientImpl() override;
 
-        // Вызывает фабрика после создания shared_ptr
         void Initialise();
 
         void ProcessTick() override;
+
+        Logging::Logger::Shared& Log() override;
 
         void Send(const std::vector<std::uint8_t>& data) override;
         void Send(std::string_view text) override;
@@ -134,4 +135,4 @@ namespace Utils::Net::WebSocket {
         std::deque<ClientEvent> events_;
     };
 
-} // namespace Utils::Net::WebSocket
+} // namespace Utils::Net::Websocket

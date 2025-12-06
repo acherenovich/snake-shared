@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../interface/websocket.hpp"
-
 #include <deque>
 #include <mutex>
 #include <string>
@@ -14,9 +12,10 @@
 #include <boost/beast/ssl.hpp>
 #include <boost/json.hpp>
 
-#include "../../logging/interface/logging.hpp"
+#include <websocket.hpp>
+#include <logging.hpp>
 
-namespace Utils::Net::WebSocket {
+namespace Utils::Net::Websocket {
 
     namespace asio      = boost::asio;
     namespace beast     = boost::beast;
@@ -26,7 +25,6 @@ namespace Utils::Net::WebSocket {
 
     class ServerImpl;
 
-    // Базовый класс, чтобы при необходимости различать внутренние типы.
     class BasicSessionBase
     {
     public:
@@ -48,7 +46,6 @@ namespace Utils::Net::WebSocket {
                          const std::string& remoteAddress,
                          std::uint16_t remotePort);
 
-        // Session интерфейс
         [[nodiscard]] std::string RemoteAddress() const override;
         [[nodiscard]] std::uint16_t RemotePort() const override;
 
@@ -58,7 +55,6 @@ namespace Utils::Net::WebSocket {
         void Send(std::string_view text) override;
         void Send(const json::value& jsonValue) override;
 
-        // Запуск WS-accept и чтения
         void Run();
 
     private:
@@ -88,4 +84,4 @@ namespace Utils::Net::WebSocket {
     using PlainSession = BasicSessionImpl<beast::tcp_stream>;
     using TlsSession   = BasicSessionImpl<asio::ssl::stream<asio::ip::tcp::socket>>;
 
-} // namespace Utils::Net::WebSocket
+} // namespace Utils::Net::Websocket

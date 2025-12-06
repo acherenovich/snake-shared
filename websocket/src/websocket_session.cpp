@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <format>
 
-namespace Utils::Net::WebSocket {
+namespace Utils::Net::Websocket {
 
     // ========== BasicSessionImpl ==========
 
@@ -276,9 +276,8 @@ namespace Utils::Net::WebSocket {
         return logger_;
     }
 
-    // ========= Явные инстанциации шаблонов =========
 
     template class BasicSessionImpl<beast::tcp_stream>;
     template class BasicSessionImpl<asio::ssl::stream<asio::ip::tcp::socket>>;
 
-} // namespace Utils::Net::WebSocket
+} // namespace Utils::Net::Websocket
