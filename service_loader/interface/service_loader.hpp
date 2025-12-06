@@ -13,7 +13,9 @@ namespace Utils::Service {
     public:
         virtual ~BaseServiceContainerTemplate() = default;
 
-        virtual std::string GetServiceContainerName() const
+        virtual void OnSetupContainerSuccess() {}
+
+        [[nodiscard]] virtual std::string GetServiceContainerName() const
         {
             return "unknown";
         }
