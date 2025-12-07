@@ -5,6 +5,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(SnakeSharedModule)
+
 # Список реально включённых модулей
 set(SNAKE_SHARED_ENABLED_MODULE_DIRS "")
 
@@ -23,7 +26,7 @@ foreach(mod_dir ${SNAKE_SHARED_SUBDIRS})
         set(OPT_NAME "VSHARED_ENABLE_${MOD_UPPER}")
 
         if (NOT DEFINED ${OPT_NAME})
-            option(${OPT_NAME} "Enable snake-shared module ${mod_dir}" ON)
+            option(${OPT_NAME} "Enable snake-shared module ${mod_dir}" OFF)
         endif()
 
         if (${OPT_NAME})

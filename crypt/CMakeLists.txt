@@ -1,30 +1,18 @@
-set(VSHARED_ENABLE_LOGGING ON CACHE BOOL "" FORCE)
+# snake-shared/crypt/CMakeLists.txt
 
-add_library(snake_shared_crypt STATIC
-        src/crypt.cpp
-        interface/crypt.hpp
-)
-
-target_compile_features(snake_shared_crypt PUBLIC cxx_std_23)
+# crypt зависит от логгера, utils и coroutine
+set(VSHARED_ENABLE_LOGGING   ON CACHE BOOL "" FORCE)
+set(VSHARED_ENABLE_UTILS     ON CACHE BOOL "" FORCE)
+set(VSHARED_ENABLE_COROUTINE ON CACHE BOOL "" FORCE)
 
 find_package(OpenSSL REQUIRED)
 
-target_include_directories(snake_shared_crypt
-        PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/interface>
-        PRIVATE
-        /usr/local/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/../logging/interface
-        ${CMAKE_CURRENT_SOURCE_DIR}/../utils/interface
-        ${CMAKE_CURRENT_SOURCE_DIR}/../coroutine/interface
-)
-
-target_link_libraries(snake_shared_crypt
-        PUBLIC
-        snake-shared::logging
+snake_shared_add_static_module(crypt
+        DEPS
+        logging
+        utils
+        coroutine
+        PUBLIC_LIBS
         OpenSSL::SSL
         OpenSSL::Crypto
 )
-
-add_library(snake-shared::crypt ALIAS snake_shared_crypt)
