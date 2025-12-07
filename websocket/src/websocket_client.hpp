@@ -33,6 +33,7 @@ namespace Utils::Net::Websocket {
     {
         Connected,
         Disconnected,
+        ConnectionError,
         Bytes,
         Text,
         Json

@@ -155,7 +155,8 @@ namespace Utils::Net::Websocket {
             }
 
             ClientEvent event;
-            event.type = ClientEventType::Disconnected;
+            event.type = ClientEventType::ConnectionError;
+            event.text = "resolva_addr_failed: " + ec.message();
             EnqueueEvent(event);
 
             ScheduleReconnect();
@@ -218,7 +219,8 @@ namespace Utils::Net::Websocket {
             }
 
             ClientEvent event;
-            event.type = ClientEventType::Disconnected;
+            event.type = ClientEventType::ConnectionError;
+            event.text = "connection_error: " + ec.message();
             EnqueueEvent(event);
 
             ScheduleReconnect();
@@ -282,7 +284,8 @@ namespace Utils::Net::Websocket {
             }
 
             ClientEvent event;
-            event.type = ClientEventType::Disconnected;
+            event.type = ClientEventType::ConnectionError;
+            event.text = "ssl_handshake_failed: " + ec.message();
             EnqueueEvent(event);
 
             ScheduleReconnect();
@@ -331,7 +334,8 @@ namespace Utils::Net::Websocket {
             }
 
             ClientEvent event;
-            event.type = ClientEventType::Disconnected;
+            event.type = ClientEventType::ConnectionError;
+            event.text = "ws_handhsake_failed: " + ec.message();
             EnqueueEvent(event);
 
             ScheduleReconnect();
@@ -524,25 +528,28 @@ namespace Utils::Net::Websocket {
         {
             switch (event.type)
             {
-            case ClientEventType::Connected:
-                listener_->OnConnected();
-                break;
+                case ClientEventType::Connected:
+                    listener_->OnConnected();
+                    break;
 
-            case ClientEventType::Disconnected:
-                listener_->OnDisconnected();
-                break;
+                case ClientEventType::Disconnected:
+                    listener_->OnDisconnected();
+                    break;
 
-            case ClientEventType::Bytes:
-                listener_->OnMessage(event.bytes);
-                break;
+                case ClientEventType::ConnectionError:
+                    listener_->OnConnectionError(event.text, config_.autoReconnect);
 
-            case ClientEventType::Text:
-                listener_->OnMessage(event.text);
-                break;
+                case ClientEventType::Bytes:
+                    listener_->OnMessage(event.bytes);
+                    break;
 
-            case ClientEventType::Json:
-                listener_->OnMessage(event.jsonValue);
-                break;
+                case ClientEventType::Text:
+                    listener_->OnMessage(event.text);
+                    break;
+
+                case ClientEventType::Json:
+                    listener_->OnMessage(event.jsonValue);
+                    break;
             }
         }
     }

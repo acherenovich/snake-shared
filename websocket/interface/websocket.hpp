@@ -119,12 +119,14 @@ namespace Utils::Net::Websocket {
 
         virtual ~ClientListener() = default;
 
-        virtual void OnConnected() = 0;
-        virtual void OnDisconnected() = 0;
+        virtual void OnConnected() {};
+        virtual void OnDisconnected() {};
 
-        virtual void OnMessage(const std::vector<std::uint8_t>& data) = 0;
-        virtual void OnMessage(std::string_view text) = 0;
-        virtual void OnMessage(const JsonValue& json) = 0;
+        virtual void OnConnectionError(const std::string & error, bool reconnect) {};
+
+        virtual void OnMessage(const std::vector<std::uint8_t>& data) {}
+        virtual void OnMessage(std::string_view text) {}
+        virtual void OnMessage(const JsonValue& json) {}
     };
 
     struct ClientConfig
