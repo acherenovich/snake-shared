@@ -7,7 +7,11 @@
 namespace Utils {
     inline void SetEnv(const std::string & key, const std::string & value)
     {
+#if defined(_WIN32)
+        _putenv_s(key.c_str(), value.c_str());
+#else
         setenv(key.c_str(), value.c_str(), 1);
+#endif
     }
 
     inline std::string Env(const std::string & key)
