@@ -215,8 +215,15 @@ namespace Utils::DB::MySQL {
 
     void ClientImpl::ProcessTick()
     {
-        std::deque<CompletedJob> local;
+        const auto now = std::chrono::steady_clock::now();
 
+        if (now - lastKeepAlive_ >= std::chrono::seconds(30))
+        {
+            KeepAliveAllConnections();
+            lastKeepAlive_ = now;
+        }
+
+        std::deque<CompletedJob> local;
         {
             std::lock_guard lock(completedMutex_);
             local.swap(completedJobs_);
@@ -240,6 +247,57 @@ namespace Utils::DB::MySQL {
                 Log()->Error("MySQL callback threw unknown exception");
             }
         }
+    }
+
+    void ClientImpl::KeepAliveAllConnections()
+    {
+        std::lock_guard lock(poolMutex_);
+
+        for (std::size_t i = 0; i < config_.poolSize; ++i)
+        {
+            Execute("SELECT 1;", {});
+        }
+    }
+
+    bool ClientImpl::Reconnect(MYSQL *& conn)
+    {
+        if (!conn)
+            return false;
+
+        mysql_close(conn);
+        conn = mysql_init(nullptr);
+        if (!conn)
+            return false;
+
+        const unsigned long connectTimeoutSec =
+            static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(config_.connectTimeout).count());
+        mysql_options(conn, MYSQL_OPT_CONNECT_TIMEOUT, &connectTimeoutSec);
+
+        const unsigned long readTimeoutSec =
+            static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(config_.readTimeout).count());
+        mysql_options(conn, MYSQL_OPT_READ_TIMEOUT, &readTimeoutSec);
+
+        const unsigned long writeTimeoutSec =
+            static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(config_.writeTimeout).count());
+        mysql_options(conn, MYSQL_OPT_WRITE_TIMEOUT, &writeTimeoutSec);
+
+        MYSQL * res = mysql_real_connect(
+            conn,
+            config_.host.c_str(),
+            config_.user.c_str(),
+            config_.password.c_str(),
+            config_.database.empty() ? nullptr : config_.database.c_str(),
+            config_.port,
+            nullptr,
+            0);
+
+        if (!res)
+            return false;
+
+        if (!config_.charset.empty())
+            mysql_set_character_set(conn, config_.charset.c_str());
+
+        return true;
     }
 
     // ===================== Worker / queue =====================
@@ -340,6 +398,8 @@ namespace Utils::DB::MySQL {
             result.success       = false;
             result.error.code    = mysql_errno(conn);
             result.error.message = mysql_error(conn);
+
+            Utils::Log()->Error("Mysql error: {}", result.error.message);
 
             const char * state = mysql_sqlstate(conn);
             if (state) {

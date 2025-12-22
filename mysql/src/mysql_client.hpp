@@ -38,6 +38,9 @@ namespace Utils::DB::MySQL {
 
         void ProcessTick() override;
 
+        void KeepAliveAllConnections();
+
+        bool Reconnect(MYSQL *& conn);
     private:
         struct Job
         {
@@ -71,6 +74,9 @@ namespace Utils::DB::MySQL {
         std::atomic<bool> stopRequested_ { false };
         std::vector<std::jthread> workers_;
 
+        std::chrono::steady_clock::time_point lastKeepAlive_{
+            std::chrono::steady_clock::now()
+        };
     private:
         void StartWorkers();
         void StopWorkers();
