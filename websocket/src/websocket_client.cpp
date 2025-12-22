@@ -373,6 +373,15 @@ namespace Utils::Net::Websocket {
             logger_->Debug("Scheduling reconnect in {} ms", delayMs);
         }
 
+        // if (config_.useTls && wsTls_)
+        // {
+        //     wsTls_->close(websocket::close_reason("closed"));
+        // }
+        // else
+        // {
+        //     wsPlain_.close(websocket::close_reason("closed"));
+        // }
+
         reconnectTimer_.expires_after(std::chrono::milliseconds(delayMs));
 
         reconnectTimer_.async_wait(

@@ -387,7 +387,14 @@ namespace Utils {
 
             void Resolve()
             {
-                fn();
+                try
+                {
+                    fn();
+                }
+                catch (const std::exception & e)
+                {
+                    Log()->Error("AwaitablePromiseTask exception: {}", e.what());
+                }
                 fn = {};
             }
 
