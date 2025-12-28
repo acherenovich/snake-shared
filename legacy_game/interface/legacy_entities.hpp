@@ -43,6 +43,7 @@ namespace Utils::Legacy::Game::Interface::Entity {
     public:
         using Shared = std::shared_ptr<Snake>;
 
+        virtual sf::Vector2f GetDestination() const = 0;
         virtual void SetDestination(const sf::Vector2f & dest) = 0;
 
         [[nodiscard]] virtual float GetRadius(bool head = false) const = 0;

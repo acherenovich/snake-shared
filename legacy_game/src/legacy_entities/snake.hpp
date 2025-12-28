@@ -29,6 +29,11 @@ namespace Utils::Legacy::Game::Entity {
 
         virtual ~Snake() = default;
 
+        [[nodiscard]] sf::Vector2f GetDestination() const override
+        {
+            return destination;
+        }
+
         void SetDestination(const sf::Vector2f & dest) override
         {
             destination = dest;
@@ -134,6 +139,37 @@ namespace Utils::Legacy::Game::Entity {
 
             for (auto & segment : segments)
                 segment = pos;
+        }
+
+        void NetSetFullSegments(const std::vector<sf::Vector2f>& segs)
+        {
+            segments.clear();
+            for (auto& v : segs)
+                segments.push_back(v);
+        }
+
+        // Set only head pos (used before reconstruction step)
+        void NetSetHead(const sf::Vector2f& head)
+        {
+            if (segments.empty())
+            {
+                segments.push_back(head);
+                return;
+            }
+            *segments.begin() = head;
+        }
+
+        // Move segments forward using the same rules as server
+        void NetStepBody()
+        {
+            Math::MoveEverySegmentToTop(segments, step_distance);
+        }
+
+        // Utility: ensure length according to experience
+        void NetApplyExperience(const std::uint32_t exp)
+        {
+            experience = exp;
+            RecalculateLength();
         }
 
         // Message::DataUpdate::Snake GetDataUpdate() {
