@@ -1,0 +1,54 @@
+#include "legacy_logic.hpp"
+#include <iostream>
+#include <format>
+#include <random>
+
+#include "logging.hpp"
+
+
+namespace Utils::Legacy::Game {
+    Logic::Logic()
+    {
+        const auto start = Math::GetRandomVector2fInSphere(AreaCenter, AreaRadius - 10.f);
+
+        const auto snake = std::make_shared<Entity::Snake>(0, start);
+
+        snakes_.insert(snake);
+    }
+
+    void Logic::ProcessTick()
+    {
+        frame_++;
+
+        for (auto& snake : snakes_)
+        {
+            auto dest = snake->TryMove();
+            snake->AcceptMove(dest);
+            snake->AddExperience(1);
+            snake->RecalculateLength();
+        }
+    }
+
+    std::unordered_set<Interface::Entity::Snake::Shared> Logic::Snakes() const
+    {
+        std::unordered_set<Interface::Entity::Snake::Shared> snakes;
+
+        snakes.reserve(snakes_.size());
+        for (auto& snake : snakes_)
+            snakes.insert(snake);
+
+        return snakes;
+    }
+
+    std::unordered_set<Interface::Entity::Food::Shared> Logic::Foods() const
+    {
+        std::unordered_set<Interface::Entity::Food::Shared> foods;
+
+        foods.reserve(foods_.size());
+        for (auto& snake : foods_)
+            foods.insert(snake);
+
+        return foods;
+    }
+
+} // namespace Utils::Legacy::Game
