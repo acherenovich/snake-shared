@@ -9,11 +9,6 @@
 namespace Utils::Legacy::Game {
     Logic::Logic()
     {
-        const auto start = Math::GetRandomVector2fInSphere(AreaCenter, AreaRadius - 10.f);
-
-        const auto snake = std::make_shared<Entity::Snake>(0, start);
-
-        snakes_.insert(snake);
     }
 
     void Logic::ProcessTick()
