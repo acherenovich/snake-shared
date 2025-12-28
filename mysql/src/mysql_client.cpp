@@ -76,13 +76,15 @@ namespace Utils::DB::MySQL {
             // }
 
             // подключаемся
+
+#ifdef _WIN32
             my_bool verify = 0;
             mysql_options(conn, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verify);
 
             // Если хочешь вообще не использовать TLS:
             my_bool enforceSsl = 0;
             mysql_options(conn, MYSQL_OPT_SSL_ENFORCE, &enforceSsl);
-
+#endif
 
             MYSQL * res = mysql_real_connect(
                 conn,
