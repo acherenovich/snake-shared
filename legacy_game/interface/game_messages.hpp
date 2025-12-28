@@ -47,6 +47,10 @@ namespace Utils::Legacy::Game::Net {
     }
 
 #pragma pack(push, 1)
+    struct FullUpdateHeader
+    {
+        std::uint32_t playerEntityID { 0 };
+    };
 
     struct MessageHeader
     {
@@ -208,4 +212,15 @@ namespace Utils::Legacy::Game::Net {
         return true;
     }
 
+    inline void WriteFullUpdateHeader(ByteWriter& w, const std::uint32_t playerEntityID)
+    {
+        FullUpdateHeader fh;
+        fh.playerEntityID = playerEntityID;
+        w.WritePod(fh);
+    }
+
+    inline bool ReadFullUpdateHeader(ByteReader& r, FullUpdateHeader& out)
+    {
+        return r.ReadPod(out);
+    }
 } // namespace Utils::Legacy::Game::Net
