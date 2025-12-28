@@ -547,6 +547,7 @@ namespace Utils::Net::Websocket {
 
                 case ClientEventType::ConnectionError:
                     listener_->OnConnectionError(event.text, config_.autoReconnect);
+                    break;
 
                 case ClientEventType::Bytes:
                     listener_->OnMessage(event.bytes);
