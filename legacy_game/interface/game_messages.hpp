@@ -9,23 +9,26 @@
 
 namespace Utils::Legacy::Game::Net {
 
-    constexpr std::uint16_t kNetVersion = 1;
+    // bumped due to protocol changes (CRC + snake points kind + 16-bit pointsCount + snapshot messages)
+    constexpr std::uint16_t kNetVersion = 2;
 
     enum class MessageType : std::uint16_t
     {
         // client -> server
-        ClientInput = 10,
-        RequestFullUpdate = 11,
+        ClientInput          = 10,
+        RequestFullUpdate    = 11,
+        RequestSnakeSnapshot = 12,
 
         // server -> client
-        FullUpdate = 100,
+        FullUpdate    = 100,
         PartialUpdate = 101,
+        SnakeSnapshot = 102,
     };
 
     enum class EntityType : std::uint8_t
     {
         Snake = 1,
-        Food = 2
+        Food  = 2
     };
 
     enum class EntityFlags : std::uint8_t
@@ -46,6 +49,12 @@ namespace Utils::Legacy::Game::Net {
         return (static_cast<std::uint8_t>(flags) & static_cast<std::uint8_t>(test)) != 0;
     }
 
+    enum class SnakePointsKind : std::uint8_t
+    {
+        ValidationSamples = 1, // partial updates: radius-based samples for drift validation only
+        FullSegments      = 2, // full snapshot: every segment in correct order
+    };
+
 #pragma pack(push, 1)
     struct FullUpdateHeader
     {
@@ -61,6 +70,7 @@ namespace Utils::Legacy::Game::Net {
         std::uint32_t frame { 0 };   // server frame (for updates)
 
         std::uint32_t payloadBytes { 0 };
+        std::uint32_t payloadCrc32 { 0 }; // CRC32 of payload bytes (end-to-end, after UDP reassembly)
     };
 
     struct ClientInputPayload
@@ -85,7 +95,6 @@ namespace Utils::Legacy::Game::Net {
         std::uint8_t a { 255 };
     };
 
-    // Food state (small)
     struct FoodState
     {
         float x { 0 };
@@ -94,10 +103,10 @@ namespace Utils::Legacy::Game::Net {
         std::uint8_t power { 1 };
         Color color {};
 
-        std::uint8_t killed { 0 }; // server removes immediately but keep for future flexibility
+        std::uint8_t killed { 0 };
     };
 
-    // Snake state (sampled segments)
+    // Snake state (followed by pointsCount * Vector2f)
     struct SnakeState
     {
         float headX { 0 };
@@ -106,11 +115,22 @@ namespace Utils::Legacy::Game::Net {
 
         std::uint16_t totalSegments { 0 };
 
-        // We send N samples (max 12)
-        std::uint8_t sampleCount { 0 };
-        // samples follow: sf::Vector2f packed as 2 floats (8 bytes per sample)
+        SnakePointsKind pointsKind { SnakePointsKind::ValidationSamples };
+        std::uint16_t pointsCount { 0 };
+        // points follow: x(float), y(float) repeated pointsCount times
     };
 
+    struct RequestFullUpdatePayload
+    {
+        std::uint8_t flags { 0 };
+    };
+
+    static constexpr std::uint8_t RequestFullUpdateFlag_AllSegments = 1 << 0;
+
+    struct RequestSnakeSnapshotPayload
+    {
+        std::uint32_t entityID { 0 };
+    };
 #pragma pack(pop)
 
     // ===================== ByteWriter / ByteReader =====================
@@ -173,9 +193,64 @@ namespace Utils::Legacy::Game::Net {
         }
 
         [[nodiscard]] bool End() const { return offset_ >= data_.size(); }
+        [[nodiscard]] std::size_t Remaining() const { return (offset_ <= data_.size()) ? (data_.size() - offset_) : 0; }
     };
 
+    // ===================== CRC32 =====================
+
+    inline std::uint32_t Crc32(std::span<const std::uint8_t> data)
+    {
+        static std::uint32_t table[256];
+        static bool tableInit = false;
+
+        if (!tableInit)
+        {
+            for (std::uint32_t i = 0; i < 256; ++i)
+            {
+                std::uint32_t c = i;
+                for (std::uint32_t k = 0; k < 8; ++k)
+                {
+                    if (c & 1u)
+                        c = 0xEDB88320u ^ (c >> 1u);
+                    else
+                        c >>= 1u;
+                }
+                table[i] = c;
+            }
+            tableInit = true;
+        }
+
+        std::uint32_t crc = 0xFFFFFFFFu;
+        for (const auto b : data)
+        {
+            crc = table[(crc ^ b) & 0xFFu] ^ (crc >> 8u);
+        }
+        return crc ^ 0xFFFFFFFFu;
+    }
+
     // ===================== Message helpers =====================
+
+    enum class ParseError : std::uint8_t
+    {
+        Ok = 0,
+        TooSmall,
+        BadVersion,
+        SizeMismatch,
+        CrcMismatch,
+    };
+
+    inline std::string_view ParseErrorToString(const ParseError err)
+    {
+        switch (err)
+        {
+            case ParseError::Ok:          return "Ok";
+            case ParseError::TooSmall:    return "TooSmall";
+            case ParseError::BadVersion:  return "BadVersion";
+            case ParseError::SizeMismatch:return "SizeMismatch";
+            case ParseError::CrcMismatch: return "CrcMismatch";
+        }
+        return "Unknown";
+    }
 
     inline std::vector<std::uint8_t> BuildMessage(const MessageType type,
                                                   const std::uint32_t seq,
@@ -188,6 +263,7 @@ namespace Utils::Legacy::Game::Net {
         header.seq = seq;
         header.frame = frame;
         header.payloadBytes = static_cast<std::uint32_t>(payload.size());
+        header.payloadCrc32 = payload.empty() ? 0u : Crc32(std::span<const std::uint8_t>(payload.data(), payload.size()));
 
         std::vector<std::uint8_t> out;
         out.resize(sizeof(MessageHeader) + payload.size());
@@ -202,14 +278,44 @@ namespace Utils::Legacy::Game::Net {
         return out;
     }
 
-    inline bool ParseHeader(std::span<const std::uint8_t> data, MessageHeader& outHeader)
+    inline ParseError ParseHeaderDetailed(std::span<const std::uint8_t> data, MessageHeader& outHeader)
     {
-        if (data.size() < sizeof(MessageHeader)) return false;
+        if (data.size() < sizeof(MessageHeader))
+        {
+            return ParseError::TooSmall;
+        }
+
         std::memcpy(&outHeader, data.data(), sizeof(MessageHeader));
 
-        if (outHeader.version != kNetVersion) return false;
-        if (data.size() != sizeof(MessageHeader) + outHeader.payloadBytes) return false;
-        return true;
+        if (outHeader.version != kNetVersion)
+        {
+            return ParseError::BadVersion;
+        }
+
+        const std::size_t expectedSize = sizeof(MessageHeader) + static_cast<std::size_t>(outHeader.payloadBytes);
+        if (data.size() != expectedSize)
+        {
+            return ParseError::SizeMismatch;
+        }
+
+        if (outHeader.payloadBytes > 0)
+        {
+            const auto payload = std::span<const std::uint8_t>(data.data() + sizeof(MessageHeader), outHeader.payloadBytes);
+            const auto crc = Crc32(payload);
+            if (crc != outHeader.payloadCrc32)
+            {
+                return ParseError::CrcMismatch;
+            }
+        }
+        else
+        {
+            if (outHeader.payloadCrc32 != 0u)
+            {
+                return ParseError::CrcMismatch;
+            }
+        }
+
+        return ParseError::Ok;
     }
 
     inline void WriteFullUpdateHeader(ByteWriter& w, const std::uint32_t playerEntityID)
@@ -224,13 +330,6 @@ namespace Utils::Legacy::Game::Net {
         return r.ReadPod(out);
     }
 
-    struct RequestFullUpdatePayload
-    {
-        std::uint8_t flags { 0 };
-    };
-
-    static constexpr std::uint8_t RequestFullUpdateFlag_AllSegments = 1 << 0;
-
     inline bool ReadRequestFullUpdatePayload(ByteReader& r, RequestFullUpdatePayload& out)
     {
         // Backward compatible: old clients can send empty payload
@@ -242,4 +341,10 @@ namespace Utils::Legacy::Game::Net {
 
         return r.ReadPod(out);
     }
+
+    inline bool ReadRequestSnakeSnapshotPayload(ByteReader& r, RequestSnakeSnapshotPayload& out)
+    {
+        return r.ReadPod(out);
+    }
+
 } // namespace Utils::Legacy::Game::Net
