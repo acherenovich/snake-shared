@@ -54,7 +54,7 @@ namespace Utils::Net::Websocket {
 
     struct ServerConfig
     {
-        std::string address { "0.0.0.0" };
+        std::string address { "127.0.0.1" };
         std::uint16_t port { 8080 };
 
         Mode mode { Mode::Text };
