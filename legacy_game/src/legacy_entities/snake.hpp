@@ -4,6 +4,8 @@
 
 #include "food.hpp"
 
+#include <cmath>
+
 namespace Utils::Legacy::Game::Entity {
     class Snake: public Interface::Entity::Snake, public BaseEntity {
         std::list<sf::Vector2f> segments;

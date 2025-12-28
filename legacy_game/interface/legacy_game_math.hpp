@@ -5,6 +5,7 @@
 #include <string_view>
 #include <format>
 #include <list>
+#include <vector>
 
 #include <SFML/System/Vector2.hpp>
 

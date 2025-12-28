@@ -2,9 +2,10 @@
 #include <iostream>
 #include <format>
 #include <random>
-
+#include <algorithm>
 
 namespace Utils::Legacy::Game::Math {
+    constexpr float PI = 3.1415926535f;
 
     sf::Vector2f MoveHeadToDestination(std::list<sf::Vector2f> &segments, const sf::Vector2f &dest, float limit, float max_turn_angle)
     {
@@ -26,13 +27,13 @@ namespace Utils::Legacy::Game::Math {
 
         // Нормализуем разницу углов в диапазон [-π, π]
         float angle_diff = target_angle - current_angle;
-        if (angle_diff > M_PI)
-            angle_diff -= 2 * M_PI;
-        if (angle_diff < -M_PI)
-            angle_diff += 2 * M_PI;
+        if (angle_diff > PI)
+            angle_diff -= 2 * PI;
+        if (angle_diff < -PI)
+            angle_diff += 2 * PI;
 
         // Ограничиваем разницу углов до допустимого диапазона
-        float max_turn_angle_radians = max_turn_angle * M_PI / 180.f;
+        float max_turn_angle_radians = max_turn_angle * PI / 180.f;
         if (std::abs(angle_diff) > max_turn_angle_radians)
         {
             // Ограничиваем изменение угла

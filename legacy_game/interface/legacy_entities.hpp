@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <list>
 #include <memory>
 #include <SFML/System/Vector2.hpp>
