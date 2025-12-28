@@ -20,6 +20,7 @@
 namespace Utils::Legacy::Game {
     class Logic
     {
+    protected:
         std::unordered_set<Entity::Snake::Shared> snakes_;
         std::unordered_set<Entity::Food::Shared> foods_;
 
@@ -27,7 +28,7 @@ namespace Utils::Legacy::Game {
     public:
         Logic();
 
-        void ProcessTick();
+        virtual void ProcessTick();
 
         [[nodiscard]] std::unordered_set<Interface::Entity::Snake::Shared> Snakes() const;
 

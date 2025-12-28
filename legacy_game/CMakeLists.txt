@@ -1,9 +1,9 @@
-# snake-shared/logging/CMakeLists.txt
+# snake-shared/legacy_game/CMakeLists.txt
 
 find_package(Boost REQUIRED COMPONENTS json)
 
 find_package(SFML 2.6
-        COMPONENTS system network graphics
+        COMPONENTS system
         CONFIG REQUIRED
 )
 

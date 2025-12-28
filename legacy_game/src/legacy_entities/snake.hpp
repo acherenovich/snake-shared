@@ -97,7 +97,7 @@ namespace Utils::Legacy::Game::Entity {
             }
         }
 
-        [[nodiscard]] bool CanRespawn(uint32_t frame) const
+        [[nodiscard]] bool CanRespawn(const uint32_t frame) const
         {
             return frame - frameKilled > 64;
         }
@@ -119,6 +119,19 @@ namespace Utils::Legacy::Game::Entity {
 
         void SetPosition(const sf::Vector2f & pos)
         {
+            for (auto & segment : segments)
+                segment = pos;
+        }
+
+        void Respawn(const uint32_t frame, const sf::Vector2f & pos)
+        {
+            frameKilled = 0;
+            frameCreated = frame;
+
+            experience = 30;
+
+            RecalculateLength();
+
             for (auto & segment : segments)
                 segment = pos;
         }

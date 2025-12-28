@@ -19,14 +19,6 @@ namespace Utils::Legacy::Game {
     void Logic::ProcessTick()
     {
         frame_++;
-
-        for (auto& snake : snakes_)
-        {
-            auto dest = snake->TryMove();
-            snake->AcceptMove(dest);
-            snake->AddExperience(1);
-            snake->RecalculateLength();
-        }
     }
 
     std::unordered_set<Interface::Entity::Snake::Shared> Logic::Snakes() const

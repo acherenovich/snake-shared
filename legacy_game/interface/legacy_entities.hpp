@@ -20,6 +20,8 @@ namespace Utils::Legacy::Game::Interface::Entity {
             uint8_t a = 255;
         };
 
+        [[nodiscard]] virtual std::uint32_t EntityID() const = 0;
+
         [[nodiscard]] virtual uint32_t FrameCreated() const = 0;
         [[nodiscard]] virtual uint32_t FrameKilled() const = 0;
 
