@@ -76,6 +76,14 @@ namespace Utils::DB::MySQL {
             // }
 
             // подключаемся
+            my_bool verify = 0;
+            mysql_options(conn, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verify);
+
+            // Если хочешь вообще не использовать TLS:
+            my_bool enforceSsl = 0;
+            mysql_options(conn, MYSQL_OPT_SSL_ENFORCE, &enforceSsl);
+
+
             MYSQL * res = mysql_real_connect(
                 conn,
                 config_.host.c_str(),
