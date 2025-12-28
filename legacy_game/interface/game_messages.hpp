@@ -223,4 +223,23 @@ namespace Utils::Legacy::Game::Net {
     {
         return r.ReadPod(out);
     }
+
+    struct RequestFullUpdatePayload
+    {
+        std::uint8_t flags { 0 };
+    };
+
+    static constexpr std::uint8_t RequestFullUpdateFlag_AllSegments = 1 << 0;
+
+    inline bool ReadRequestFullUpdatePayload(ByteReader& r, RequestFullUpdatePayload& out)
+    {
+        // Backward compatible: old clients can send empty payload
+        if (r.End())
+        {
+            out.flags = 0;
+            return true;
+        }
+
+        return r.ReadPod(out);
+    }
 } // namespace Utils::Legacy::Game::Net
