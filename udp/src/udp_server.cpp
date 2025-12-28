@@ -142,6 +142,15 @@ namespace Utils::Net::Udp {
 
         if (!packet.ok)
         {
+            if (logger_)
+            {
+                logger_->Warning("Dropped datagram: parse failed reason={} bytes={} from {}:{}",
+                                 PacketRejectReasonToString(packet.reject),
+                                 bytes,
+                                 remoteEndpoint_.address().to_string(),
+                                 remoteEndpoint_.port());
+            }
+
             StartReceive();
             return;
         }
@@ -259,7 +268,16 @@ namespace Utils::Net::Udp {
         auto session = GetSession(sid);
         if (!session)
         {
-            // Unknown session => ignore (best effort)
+            if (logger_)
+            {
+                logger_->Warning("Dropped fragment: unknown sessionId={} from {}:{} mid={} idx={}/{}",
+                                 sid,
+                                 sender.address().to_string(),
+                                 sender.port(),
+                                 packet.header.messageId,
+                                 packet.header.fragmentIndex,
+                                 packet.header.fragmentCount);
+            }
             return;
         }
 

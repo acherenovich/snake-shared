@@ -9,7 +9,7 @@
 namespace Utils::Net::Udp {
 
     constexpr std::uint32_t kUdpMagic = 0x534E4B55; // "S N K U"
-    constexpr std::uint16_t kUdpVersion = 1;
+    constexpr std::uint16_t kUdpVersion = 2;        // IMPORTANT: bumped (protocol changed)
 
     enum class PacketType : std::uint8_t
     {

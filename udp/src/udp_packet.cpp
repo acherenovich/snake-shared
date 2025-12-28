@@ -43,6 +43,7 @@ namespace Utils::Net::Udp {
 
         if (datagram.size() < sizeof(PacketHeader))
         {
+            result.reject = PacketRejectReason::TooSmall;
             return result;
         }
 
@@ -50,13 +51,15 @@ namespace Utils::Net::Udp {
 
         if (result.header.magic != kUdpMagic || result.header.version != kUdpVersion)
         {
+            result.reject = PacketRejectReason::BadMagicVersion;
             return result;
         }
 
         const std::size_t payloadOffset = sizeof(PacketHeader);
 
-        if (payloadOffset + result.header.payloadSize > datagram.size())
+        if (payloadOffset + static_cast<std::size_t>(result.header.payloadSize) > datagram.size())
         {
+            result.reject = PacketRejectReason::SizeMismatch;
             return result;
         }
 
@@ -66,6 +69,7 @@ namespace Utils::Net::Udp {
 
         if (HeaderCrc(result.header) != headerCrc)
         {
+            result.reject = PacketRejectReason::HeaderCrcMismatch;
             return result;
         }
 
@@ -74,11 +78,28 @@ namespace Utils::Net::Udp {
             const std::uint32_t payloadCrc = Crc32(result.payload.data(), result.payload.size());
             if (payloadCrc != result.header.payloadCrc)
             {
+                result.reject = PacketRejectReason::PayloadCrcMismatch;
+                return result;
+            }
+        }
+
+        // Extra sanity for fragments
+        if (result.header.type == PacketType::DataFragment)
+        {
+            if (result.header.fragmentCount == 0 ||
+                result.header.fragmentIndex >= result.header.fragmentCount ||
+                result.header.totalSize == 0 ||
+                result.header.fragmentOffset > result.header.totalSize ||
+                (static_cast<std::uint64_t>(result.header.fragmentOffset) + static_cast<std::uint64_t>(result.header.payloadSize)) >
+                    static_cast<std::uint64_t>(result.header.totalSize))
+            {
+                result.reject = PacketRejectReason::InvalidFragmentFields;
                 return result;
             }
         }
 
         result.ok = true;
+        result.reject = PacketRejectReason::None;
         return result;
     }
 

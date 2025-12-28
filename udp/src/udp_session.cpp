@@ -95,6 +95,10 @@ namespace Utils::Net::Udp {
 
         if (maxPayloadPerPacket == 0)
         {
+            if (logger_)
+            {
+                logger_->Warning("Send failed: maxPayloadPerPacket == 0");
+            }
             return;
         }
 
@@ -103,6 +107,8 @@ namespace Utils::Net::Udp {
         const std::size_t total = payload.size();
         const std::uint16_t fragmentCount = static_cast<std::uint16_t>(
             (total + maxPayloadPerPacket - 1) / maxPayloadPerPacket);
+
+        const std::uint32_t messageCrc = total == 0 ? 0u : Crc32(payload.data(), payload.size());
 
         for (std::uint16_t index = 0; index < fragmentCount; ++index)
         {
@@ -116,6 +122,9 @@ namespace Utils::Net::Udp {
             header.fragmentIndex = index;
             header.fragmentCount = fragmentCount;
             header.totalSize = static_cast<std::uint32_t>(total);
+
+            header.fragmentOffset = static_cast<std::uint32_t>(offset); // NEW
+            header.messageCrc = messageCrc;                             // NEW
 
             const auto packet = BuildPacket(header, payload.subspan(offset, size));
 
@@ -155,16 +164,52 @@ namespace Utils::Net::Udp {
             return;
         }
 
-        const bool done = reassembly_.AddFragment(
+        const AddFragmentResult res = reassembly_.AddFragment(
             packet.header.messageId,
             packet.header.fragmentIndex,
             packet.header.fragmentCount,
             packet.header.totalSize,
+            packet.header.fragmentOffset,
+            packet.header.messageCrc,
             packet.payload.data(),
             packet.payload.size()
         );
 
-        if (done)
+        if (res.outcome == AddFragmentOutcome::Rejected)
+        {
+            if (logger_)
+            {
+                logger_->Warning("Dropped fragment: reassembly reject reason={} sid={} mid={} idx={}/{} off={} size={} total={} msgCrc={}",
+                                 res.reason,
+                                 packet.header.sessionId,
+                                 packet.header.messageId,
+                                 packet.header.fragmentIndex,
+                                 packet.header.fragmentCount,
+                                 packet.header.fragmentOffset,
+                                 packet.header.payloadSize,
+                                 packet.header.totalSize,
+                                 packet.header.messageCrc);
+            }
+            return;
+        }
+
+        if (res.outcome == AddFragmentOutcome::Duplicate)
+        {
+            if (logger_)
+            {
+                logger_->Warning("Duplicate fragment ignored: sid={} mid={} idx={}/{} off={} size={} total={}",
+                                 packet.header.sessionId,
+                                 packet.header.messageId,
+                                 packet.header.fragmentIndex,
+                                 packet.header.fragmentCount,
+                                 packet.header.fragmentOffset,
+                                 packet.header.payloadSize,
+                                 packet.header.totalSize);
+            }
+            return;
+        }
+
+        if (res.outcome == AddFragmentOutcome::Completed)
         {
             EmitCompletedMessages();
         }

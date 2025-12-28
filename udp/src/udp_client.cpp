@@ -179,33 +179,88 @@ namespace Utils::Net::Udp {
         const auto span = std::span<const std::uint8_t>(rxBuffer_.data(), bytes);
         ParsedPacket packet = ParsePacket(span);
 
-        if (packet.ok)
+        if (!packet.ok)
         {
-            if (packet.header.type == PacketType::HandshakeWelcome)
+            if (logger_)
             {
-                OnWelcome(packet);
+                logger_->Warning("Dropped datagram: parse failed reason={} bytes={} from {}:{}",
+                                 PacketRejectReasonToString(packet.reject),
+                                 bytes,
+                                 remoteEndpoint_.address().to_string(),
+                                 remoteEndpoint_.port());
             }
-            else if (packet.header.type == PacketType::DataFragment)
-            {
-                if (packet.header.sessionId != sessionId_.load())
-                {
-                    // ignore чужие
-                }
-                else
-                {
-                    const bool done = reassembly_.AddFragment(
-                        packet.header.messageId,
-                        packet.header.fragmentIndex,
-                        packet.header.fragmentCount,
-                        packet.header.totalSize,
-                        packet.payload.data(),
-                        packet.payload.size()
-                    );
 
-                    if (done)
+            StartReceive();
+            return;
+        }
+
+        if (packet.header.type == PacketType::HandshakeWelcome)
+        {
+            OnWelcome(packet);
+        }
+        else if (packet.header.type == PacketType::DataFragment)
+        {
+            const std::uint64_t expectedSid = sessionId_.load();
+            if (packet.header.sessionId != expectedSid)
+            {
+                if (logger_)
+                {
+                    logger_->Warning("Dropped fragment: чужой sessionId. got={} expected={} mid={} idx={}/{} from {}:{}",
+                                     packet.header.sessionId,
+                                     expectedSid,
+                                     packet.header.messageId,
+                                     packet.header.fragmentIndex,
+                                     packet.header.fragmentCount,
+                                     remoteEndpoint_.address().to_string(),
+                                     remoteEndpoint_.port());
+                }
+            }
+            else
+            {
+                const AddFragmentResult res = reassembly_.AddFragment(
+                    packet.header.messageId,
+                    packet.header.fragmentIndex,
+                    packet.header.fragmentCount,
+                    packet.header.totalSize,
+                    packet.header.fragmentOffset,
+                    packet.header.messageCrc,
+                    packet.payload.data(),
+                    packet.payload.size()
+                );
+
+                if (res.outcome == AddFragmentOutcome::Rejected)
+                {
+                    if (logger_)
                     {
-                        EmitCompletedMessages();
+                        logger_->Warning("Dropped fragment: reassembly reject reason={} sid={} mid={} idx={}/{} off={} size={} total={} msgCrc={}",
+                                         res.reason,
+                                         packet.header.sessionId,
+                                         packet.header.messageId,
+                                         packet.header.fragmentIndex,
+                                         packet.header.fragmentCount,
+                                         packet.header.fragmentOffset,
+                                         packet.header.payloadSize,
+                                         packet.header.totalSize,
+                                         packet.header.messageCrc);
                     }
+                }
+                else if (res.outcome == AddFragmentOutcome::Duplicate)
+                {
+                    if (logger_)
+                    {
+                        logger_->Warning("Duplicate fragment ignored: sid={} mid={} idx={}/{} off={} size={} total={}",
+                                         packet.header.sessionId,
+                                         packet.header.messageId,
+                                         packet.header.fragmentIndex,
+                                         packet.header.fragmentCount,
+                                         packet.header.fragmentOffset,
+                                         packet.header.payloadSize,
+                                         packet.header.totalSize);
+                    }
+                }
+                else if (res.outcome == AddFragmentOutcome::Completed)
+                {
+                    EmitCompletedMessages();
                 }
             }
         }
@@ -346,6 +401,9 @@ namespace Utils::Net::Udp {
 
     void ClientImpl::ProcessTick()
     {
+        // IMPORTANT: cleanup incomplete reassembly
+        reassembly_.TickCleanup();
+
         std::deque<ClientEvent> local;
 
         {
@@ -403,6 +461,12 @@ namespace Utils::Net::Udp {
 
         if (payload.size() > config_.maxMessageSize)
         {
+            if (logger_)
+            {
+                logger_->Warning("Send payload too large: {} bytes (max={})",
+                                 payload.size(),
+                                 config_.maxMessageSize);
+            }
             return;
         }
 
@@ -411,6 +475,10 @@ namespace Utils::Net::Udp {
 
         if (maxPayloadPerPacket == 0)
         {
+            if (logger_)
+            {
+                logger_->Warning("Send failed: maxPayloadPerPacket == 0");
+            }
             return;
         }
 
@@ -420,6 +488,8 @@ namespace Utils::Net::Udp {
         const std::size_t total = payload.size();
         const std::uint16_t fragmentCount = static_cast<std::uint16_t>(
             (total + maxPayloadPerPacket - 1) / maxPayloadPerPacket);
+
+        const std::uint32_t messageCrc = total == 0 ? 0u : Crc32(payload.data(), payload.size());
 
         for (std::uint16_t index = 0; index < fragmentCount; ++index)
         {
@@ -433,6 +503,9 @@ namespace Utils::Net::Udp {
             header.fragmentIndex = index;
             header.fragmentCount = fragmentCount;
             header.totalSize = static_cast<std::uint32_t>(total);
+
+            header.fragmentOffset = static_cast<std::uint32_t>(offset); // NEW
+            header.messageCrc = messageCrc;                             // NEW
 
             const auto packet = BuildPacket(header, payload.subspan(offset, size));
 
