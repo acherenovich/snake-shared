@@ -155,6 +155,8 @@ namespace Utils::Net::Udp {
         using Shared = std::shared_ptr<Client>;
         virtual ~Client() = default;
 
+        virtual uint64_t SessionID() = 0;
+
         virtual void ProcessTick() = 0;
 
         virtual Logging::Logger::Shared& Log() = 0;

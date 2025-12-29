@@ -52,6 +52,8 @@ namespace Utils::Net::Udp {
 
         void ProcessTick() override;
 
+        uint64_t SessionID() override;
+
         Logging::Logger::Shared& Log() override;
 
         void Send(const std::vector<std::uint8_t>& data) override;

@@ -447,6 +447,11 @@ namespace Utils::Net::Udp {
         }
     }
 
+    uint64_t ClientImpl::SessionID()
+    {
+        return sessionId_.load();
+    }
+
     Logging::Logger::Shared& ClientImpl::Log()
     {
         return logger_;
