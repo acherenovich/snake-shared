@@ -52,7 +52,7 @@ namespace Utils::Legacy::Game::Interface::Entity {
         [[nodiscard]] virtual const uint32_t & GetExperience() const = 0;
 
         [[nodiscard]] virtual float GetZoom() const = 0;
-        [[nodiscard]] virtual const std::list<sf::Vector2f> & Segments() const = 0;
+        [[nodiscard]] virtual std::list<sf::Vector2f> & Segments() = 0;
     };
 
 }

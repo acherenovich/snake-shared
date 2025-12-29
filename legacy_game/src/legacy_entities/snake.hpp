@@ -229,7 +229,7 @@ namespace Utils::Legacy::Game::Entity {
             return 1.f + static_cast<float>(experience) / 10 * 0.01f;
         }
 
-        [[nodiscard]] const std::list<sf::Vector2f> & Segments() const final
+        [[nodiscard]] std::list<sf::Vector2f> & Segments() final
         {
             return segments;
         }
