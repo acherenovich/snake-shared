@@ -8,10 +8,25 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(SnakeSharedModule)
 
-# Список реально включённых модулей
+# ======================================================================
+# Global compile defaults for ALL snake-shared modules (important!)
+# ======================================================================
+set(SNAKE_SHARED_COMMON_COMPILE_OPTIONS
+        -Wall -Wextra
+        -Wno-unused-variable
+        -Wno-unused-parameter
+        -Wno-sign-compare
+        -Wno-deprecated-declarations
+)
+
+# No RTTI/EXCEPTIONS hacks here! leave defaults.
+# If you disable them accidentally in some module -> type_info conflicts.
+
+# ======================================================================
+# Enabled modules list
+# ======================================================================
 set(SNAKE_SHARED_ENABLED_MODULE_DIRS "")
 
-# Находим подпапки верхнего уровня
 file(GLOB SNAKE_SHARED_SUBDIRS
         CONFIGURE_DEPENDS
         RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -39,12 +54,13 @@ foreach(mod_dir ${SNAKE_SHARED_SUBDIRS})
     endif()
 endforeach()
 
-# Агрегирующий таргет, который тащит все включённые модули
+# ======================================================================
+# Aggregator target, links all enabled modules
+# ======================================================================
 add_library(snake_shared_all INTERFACE)
 add_library(snake-shared::all ALIAS snake_shared_all)
 
 foreach(mod_dir ${SNAKE_SHARED_ENABLED_MODULE_DIRS})
-    # ожидаем, что модуль определил alias вида snake-shared::<имя_папки>
     target_link_libraries(snake_shared_all
             INTERFACE
             "snake-shared::${mod_dir}"

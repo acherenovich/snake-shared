@@ -205,6 +205,50 @@ namespace Utils::Net::Websocket {
             });
     }
 
+#ifdef _WIN32
+#include <windows.h>
+#include <string>
+
+    static std::string WideToUtf8(const std::wstring& w)
+    {
+        if (w.empty()) return {};
+        const int size = WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), nullptr, 0, nullptr, nullptr);
+        std::string out(size, 0);
+        WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), out.data(), size, nullptr, nullptr);
+        return out;
+    }
+
+    static std::string GetWinErrorMessageUtf8(DWORD err)
+    {
+        wchar_t* buffer = nullptr;
+        const DWORD len = FormatMessageW(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            nullptr,
+            err,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPWSTR)&buffer,
+            0,
+            nullptr
+        );
+
+        std::wstring msg(buffer ? buffer : L"", len);
+        if (buffer)
+            LocalFree(buffer);
+
+        return WideToUtf8(msg);
+    }
+#endif
+
+    static std::string NormalizeSystemMessageUtf8(const boost::system::error_code& ec)
+    {
+#ifdef _WIN32
+        if (ec.category() == boost::system::system_category())
+            return GetWinErrorMessageUtf8(static_cast<DWORD>(ec.value()));
+#endif
+        return ec.message();
+    }
+
+
     void ClientImpl::OnConnect(const error_code ec,
                                const tcp::endpoint& endpoint)
     {
@@ -215,7 +259,7 @@ namespace Utils::Net::Websocket {
                 logger_->Error("Connect error -> {}:{} -> {}",
                                endpoint.address().to_string(),
                                endpoint.port(),
-                               ec.message());
+                               NormalizeSystemMessageUtf8(ec));
             }
 
             ClientEvent event;

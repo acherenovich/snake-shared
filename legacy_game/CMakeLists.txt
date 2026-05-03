@@ -2,10 +2,7 @@
 
 find_package(Boost REQUIRED COMPONENTS json)
 
-find_package(SFML 2.6
-        COMPONENTS system
-        CONFIG REQUIRED
-)
+find_package(SFML 3 REQUIRED COMPONENTS System)
 
 snake_shared_add_static_module(legacy_game
         DEPS
@@ -13,5 +10,5 @@ snake_shared_add_static_module(legacy_game
         coroutine
         PUBLIC_LIBS
         Boost::json
-        ${MYSQLCLIENT_LIBRARY}
+        SFML::System
 )
