@@ -12,6 +12,7 @@ namespace Utils::Legacy::Game::Entity {
         uint32_t experience = 30;
         sf::Vector2f destination;
         std::string name;
+        Color color_ {};
     public:
         using Shared = std::shared_ptr<Snake>;
 
@@ -232,6 +233,16 @@ namespace Utils::Legacy::Game::Entity {
         [[nodiscard]] std::list<sf::Vector2f> & Segments() final
         {
             return segments;
+        }
+
+        [[nodiscard]] Color GetColor() const override
+        {
+            return color_;
+        }
+
+        void SetColor(const Color & c) override
+        {
+            color_ = c;
         }
     };
 }

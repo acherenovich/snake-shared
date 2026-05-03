@@ -9,8 +9,8 @@
 
 namespace Utils::Legacy::Game::Net {
 
-    // bumped due to protocol changes (CRC + snake points kind + 16-bit pointsCount + snapshot messages)
-    constexpr std::uint16_t kNetVersion = 2;
+    // bumped due to protocol changes (CRC + snake points kind + 16-bit pointsCount + snapshot messages + snake color)
+    constexpr std::uint16_t kNetVersion = 3;
 
     enum class MessageType : std::uint16_t
     {
@@ -117,6 +117,7 @@ namespace Utils::Legacy::Game::Net {
 
         SnakePointsKind pointsKind { SnakePointsKind::ValidationSamples };
         std::uint16_t pointsCount { 0 };
+        Color color {};
         // points follow: x(float), y(float) repeated pointsCount times
     };
 

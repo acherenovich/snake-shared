@@ -53,6 +53,9 @@ namespace Utils::Legacy::Game::Interface::Entity {
 
         [[nodiscard]] virtual float GetZoom() const = 0;
         [[nodiscard]] virtual std::list<sf::Vector2f> & Segments() = 0;
+
+        [[nodiscard]] virtual Color GetColor() const = 0;
+        virtual void SetColor(const Color & c) = 0;
     };
 
 }
