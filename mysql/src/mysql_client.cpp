@@ -153,6 +153,7 @@ namespace Utils::DB::MySQL {
     {
         stopRequested_.store(true);
         queueCv_.notify_all();
+        poolCv_.notify_all();
         workers_.clear();
     }
 
@@ -222,7 +223,7 @@ namespace Utils::DB::MySQL {
     {
         const auto now = std::chrono::steady_clock::now();
 
-        if (now - lastKeepAlive_ >= std::chrono::seconds(30))
+        if (now - lastKeepAlive_ >= std::chrono::seconds(10))
         {
             KeepAliveAllConnections();
             lastKeepAlive_ = now;
@@ -269,25 +270,24 @@ namespace Utils::DB::MySQL {
         if (!conn)
             return false;
 
-        mysql_close(conn);
-        conn = mysql_init(nullptr);
-        if (!conn)
+        MYSQL* newConn = mysql_init(nullptr);
+        if (!newConn)
             return false;
 
         const unsigned long connectTimeoutSec =
             static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(config_.connectTimeout).count());
-        mysql_options(conn, MYSQL_OPT_CONNECT_TIMEOUT, &connectTimeoutSec);
+        mysql_options(newConn, MYSQL_OPT_CONNECT_TIMEOUT, &connectTimeoutSec);
 
         const unsigned long readTimeoutSec =
             static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(config_.readTimeout).count());
-        mysql_options(conn, MYSQL_OPT_READ_TIMEOUT, &readTimeoutSec);
+        mysql_options(newConn, MYSQL_OPT_READ_TIMEOUT, &readTimeoutSec);
 
         const unsigned long writeTimeoutSec =
             static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(config_.writeTimeout).count());
-        mysql_options(conn, MYSQL_OPT_WRITE_TIMEOUT, &writeTimeoutSec);
+        mysql_options(newConn, MYSQL_OPT_WRITE_TIMEOUT, &writeTimeoutSec);
 
         MYSQL * res = mysql_real_connect(
-            conn,
+            newConn,
             config_.host.c_str(),
             config_.user.c_str(),
             config_.password.c_str(),
@@ -297,11 +297,17 @@ namespace Utils::DB::MySQL {
             0);
 
         if (!res)
+        {
+            Log()->Error("MySQL reconnect failed: {} ({})", mysql_error(newConn), mysql_errno(newConn));
+            mysql_close(newConn);
             return false;
+        }
 
         if (!config_.charset.empty())
-            mysql_set_character_set(conn, config_.charset.c_str());
+            mysql_set_character_set(newConn, config_.charset.c_str());
 
+        mysql_close(conn);
+        conn = newConn;
         return true;
     }
 
@@ -362,13 +368,12 @@ namespace Utils::DB::MySQL {
     MYSQL * ClientImpl::AcquireConnection()
     {
         std::unique_lock lock(poolMutex_);
-        if (freeConnections_.empty()) {
-            // если всё занято — просто берём любое (на будущее можно сделать более умный wait)
-            if (!allConnections_.empty()) {
-                return allConnections_.front();
-            }
+        poolCv_.wait(lock, [this] {
+            return stopRequested_.load() || !freeConnections_.empty() || allConnections_.empty();
+        });
+
+        if (stopRequested_.load() || freeConnections_.empty())
             return nullptr;
-        }
 
         MYSQL * conn = freeConnections_.front();
         freeConnections_.pop_front();
@@ -383,6 +388,23 @@ namespace Utils::DB::MySQL {
 
         std::lock_guard lock(poolMutex_);
         freeConnections_.push_back(conn);
+        poolCv_.notify_one();
+    }
+
+    void ClientImpl::ReplaceConnection(MYSQL* oldConn, MYSQL* newConn)
+    {
+        if (!newConn)
+            return;
+
+        std::lock_guard lock(poolMutex_);
+        for (auto& conn : allConnections_)
+        {
+            if (conn == oldConn)
+            {
+                conn = newConn;
+                break;
+            }
+        }
     }
 
     // ===================== Query execution =====================
@@ -399,23 +421,24 @@ namespace Utils::DB::MySQL {
             return result;
         }
 
-        if (mysql_ping(conn) != 0)
-        {
-            Log()->Warning("MySQL ping failed before query: {} ({})", mysql_error(conn), mysql_errno(conn));
-            if (config_.autoReconnect && !Reconnect(conn))
-            {
-                result.success       = false;
-                result.error.code    = mysql_errno(conn);
-                result.error.message = mysql_error(conn);
-                return result;
-            }
-        }
-
         if (mysql_query(conn, sql.c_str()) != 0) {
             const unsigned int queryErr = mysql_errno(conn);
 
-            if (config_.autoReconnect && (queryErr == 2006 || queryErr == 2013) && Reconnect(conn))
+            if (config_.autoReconnect && (queryErr == 2006 || queryErr == 2013))
             {
+                MYSQL* oldConn = conn;
+                Log()->Warning("MySQL query lost connection, reconnecting: {} ({})", mysql_error(conn), queryErr);
+
+                if (!Reconnect(conn))
+                {
+                    result.success       = false;
+                    result.error.code    = queryErr;
+                    result.error.message = "MySQL reconnect failed after lost connection";
+                    return result;
+                }
+
+                ReplaceConnection(oldConn, conn);
+
                 if (mysql_query(conn, sql.c_str()) == 0)
                     goto query_ok;
             }

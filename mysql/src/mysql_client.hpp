@@ -59,6 +59,7 @@ namespace Utils::DB::MySQL {
 
         // ===== Пул соединений =====
         std::mutex poolMutex_;
+        std::condition_variable poolCv_;
         std::deque<MYSQL *> freeConnections_;
         std::vector<MYSQL *> allConnections_;
 
@@ -85,6 +86,7 @@ namespace Utils::DB::MySQL {
 
         MYSQL * AcquireConnection();
         void ReleaseConnection(MYSQL * conn);
+        void ReplaceConnection(MYSQL* oldConn, MYSQL* newConn);
 
         QueryResult ExecuteOnConnection(MYSQL * conn, const std::string & sql);
 
