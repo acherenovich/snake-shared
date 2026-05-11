@@ -7,6 +7,17 @@ namespace Utils::Net::Websocket {
 
     using asio::ip::tcp;
 
+    template<typename Stream>
+    void CloseLowestLayer(Stream& stream, boost::system::error_code& ec)
+    {
+        beast::get_lowest_layer(stream).close(ec);
+    }
+
+    void CloseLowestLayer(websocket::stream<beast::tcp_stream>& stream, boost::system::error_code& ec)
+    {
+        beast::get_lowest_layer(stream).socket().close(ec);
+    }
+
     ClientImpl::ClientImpl(const ClientConfig& config,
                            const ClientListener::Shared& listener,
                            const Logging::Logger::Shared& logger)
@@ -57,24 +68,18 @@ namespace Utils::Net::Websocket {
         stopRequested_.store(true);
 
         error_code ecClose;
-
-        if (config_.useTls && wsTls_)
-        {
-            wsTls_->close(websocket::close_code::normal, ecClose);
-        }
-        else
-        {
-            wsPlain_.close(websocket::close_code::normal, ecClose);
-        }
-
         try
         {
-            reconnectTimer_.cancel(); // в новых версиях без error_code, кидает исключение
+            resolver_.cancel();
+            reconnectTimer_.cancel();
         }
         catch (const boost::system::system_error&)
         {
-            // в деструкторе можно тихо проигнорировать
         }
+        if (config_.useTls && wsTls_)
+            CloseLowestLayer(*wsTls_, ecClose);
+        else
+            CloseLowestLayer(wsPlain_, ecClose);
 
         workGuard_.reset();
         ioContext_.stop();
@@ -711,34 +716,30 @@ namespace Utils::Net::Websocket {
     void ClientImpl::Close()
     {
         manuallyClosed_.store(true);
+        stopRequested_.store(true);
 
-        error_code ec;
-
-        if (config_.useTls && wsTls_)
+        asio::post(ioContext_, [self = shared_from_this()]
         {
-            wsTls_->close(websocket::close_code::normal, ec);
-        }
-        else
-        {
-            wsPlain_.close(websocket::close_code::normal, ec);
-        }
-
-        try
-        {
-            reconnectTimer_.cancel();
-        }
-        catch (const boost::system::system_error& e)
-        {
-            if (logger_)
+            error_code ec;
+            try
             {
-                logger_->Warning("Client reconnect timer cancel error -> {}", e.what());
+                self->resolver_.cancel();
+                self->reconnectTimer_.cancel();
             }
-        }
+            catch (const boost::system::system_error& e)
+            {
+                if (self->logger_)
+                    self->logger_->Warning("Client cancel error -> {}", e.what());
+            }
 
-        if (ec && logger_)
-        {
-            logger_->Warning("Client close error -> {}", ec.message());
-        }
+            if (self->config_.useTls && self->wsTls_)
+                CloseLowestLayer(*self->wsTls_, ec);
+            else
+                CloseLowestLayer(self->wsPlain_, ec);
+
+            if (ec && self->logger_)
+                self->logger_->Warning("Client close error -> {}", ec.message());
+        });
     }
 
     Client::Shared Client::Create(const ClientConfig& config,
