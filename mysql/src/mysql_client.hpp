@@ -86,7 +86,7 @@ namespace Utils::DB::MySQL {
         MYSQL * AcquireConnection();
         void ReleaseConnection(MYSQL * conn);
 
-        static QueryResult ExecuteOnConnection(MYSQL * conn, const std::string & sql);
+        QueryResult ExecuteOnConnection(MYSQL * conn, const std::string & sql);
 
         static JsonArray ConvertResultToJson(const MYSQL * conn, MYSQL_RES * res);
     };

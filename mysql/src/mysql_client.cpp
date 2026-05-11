@@ -70,11 +70,6 @@ namespace Utils::DB::MySQL {
                 mysql_options(conn, MYSQL_OPT_WRITE_TIMEOUT, &writeTimeoutSec);
             }
 
-            // if (config_.autoReconnect) {
-            //     bool reconnect = true;
-            //     mysql_options(conn, MYSQL_OPT_RECONNECT, &reconnect);
-            // }
-
             // подключаемся
 
 #ifdef _WIN32
@@ -404,12 +399,32 @@ namespace Utils::DB::MySQL {
             return result;
         }
 
+        if (mysql_ping(conn) != 0)
+        {
+            Log()->Warning("MySQL ping failed before query: {} ({})", mysql_error(conn), mysql_errno(conn));
+            if (config_.autoReconnect && !Reconnect(conn))
+            {
+                result.success       = false;
+                result.error.code    = mysql_errno(conn);
+                result.error.message = mysql_error(conn);
+                return result;
+            }
+        }
+
         if (mysql_query(conn, sql.c_str()) != 0) {
+            const unsigned int queryErr = mysql_errno(conn);
+
+            if (config_.autoReconnect && (queryErr == 2006 || queryErr == 2013) && Reconnect(conn))
+            {
+                if (mysql_query(conn, sql.c_str()) == 0)
+                    goto query_ok;
+            }
+
             result.success       = false;
             result.error.code    = mysql_errno(conn);
             result.error.message = mysql_error(conn);
 
-            Utils::Log()->Error("Mysql error: {}", result.error.message);
+            Log()->Error("Mysql error: {}", result.error.message);
 
             const char * state = mysql_sqlstate(conn);
             if (state) {
@@ -419,6 +434,7 @@ namespace Utils::DB::MySQL {
             return result;
         }
 
+query_ok:
         MYSQL_RES * res = mysql_store_result(conn);
         if (res) {
             // есть набор строк (SELECT и т.п.)
