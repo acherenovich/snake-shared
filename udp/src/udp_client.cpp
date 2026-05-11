@@ -587,25 +587,29 @@ namespace Utils::Net::Udp {
     void ClientImpl::Close()
     {
         manuallyClosed_.store(true);
+        stopRequested_.store(true);
 
-        error_code ec;
-        socket_.close(ec);
-
-        try
+        asio::post(ioContext_, [self = shared_from_this()]
         {
-            handshakeTimer_.cancel();
-            reconnectTimer_.cancel();
-        }
-        catch (...)
-        {
-        }
+            error_code ec;
+            try
+            {
+                self->resolver_.cancel();
+                self->handshakeTimer_.cancel();
+                self->reconnectTimer_.cancel();
+            }
+            catch (...)
+            {
+            }
+            self->socket_.close(ec);
+        });
     }
 
     Client::Shared Client::Create(const ClientConfig& config,
                                   const ClientListener::Shared& listener,
                                   const Logging::Logger::Shared& logger)
     {
-        auto client = std::make_shared<ClientImpl>(config, listener, logger);
+        std::shared_ptr<ClientImpl> client(new ClientImpl(config, listener, logger));
         client->Initialise();
         return client;
     }
