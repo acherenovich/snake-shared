@@ -148,6 +148,17 @@ namespace Utils::Service {
             }
         }
 
+        void DestroyServices()
+        {
+            for (const auto & subLoader: subLoaders_)
+            {
+                subLoader->DestroyServices();
+            }
+
+            subLoaders_.clear();
+            services_.clear();
+        }
+
 
         template<class T>
         void AddService()
