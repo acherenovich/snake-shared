@@ -188,11 +188,11 @@ namespace Utils::Net::Udp {
         reassemblyCfg.maxMessageSize = config_.maxMessageSize;
         reassemblyCfg.timeoutMs = config_.reassemblyTimeoutMs;
 
-        auto session = std::make_shared<SessionImpl>(this,
-                                                     newId,
-                                                     endpoint,
-                                                     sessionLogger,
-                                                     reassemblyCfg);
+        std::shared_ptr<SessionImpl> session(new SessionImpl(this,
+                                                             newId,
+                                                             endpoint,
+                                                             sessionLogger,
+                                                             reassemblyCfg));
 
         {
             std::lock_guard lock(sessionsMutex_);
@@ -414,7 +414,7 @@ namespace Utils::Net::Udp {
                                   const Listener::Shared& listener,
                                   const Logging::Logger::Shared& logger)
     {
-        return std::make_shared<ServerImpl>(config, listener, logger);
+        return std::shared_ptr<ServerImpl>(new ServerImpl(config, listener, logger));
     }
 
 } // namespace Utils::Net::Udp

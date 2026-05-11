@@ -605,7 +605,7 @@ namespace Utils::Net::Udp {
                                   const ClientListener::Shared& listener,
                                   const Logging::Logger::Shared& logger)
     {
-        auto client = std::make_shared<ClientImpl>(config, listener, logger);
+        std::shared_ptr<ClientImpl> client(new ClientImpl(config, listener, logger));
         client->Initialise();
         return client;
     }
